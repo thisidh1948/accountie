@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+<svg version="1.1" id="Uploaded to svgrepo.com" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" 
+	 width="800px" height="800px" viewBox="0 0 32 32" xml:space="preserve">
+<style type="text/css">
+</style>
+<g>
+	<path style="fill:#A4C83F;" d="M29,32H3c-1.657,0-3-1.343-3-3V3c0-1.657,1.343-3,3-3h26c1.657,0,3,1.343,3,3v26
+		C32,30.657,30.657,32,29,32z"/>
+	<path style="fill:#A4C83F;" d="M27,32H3c-1.657,0-3-1.343-3-3V3c0-1.657,1.343-3,3-3h24c1.657,0,3,1.343,3,3v26
+		C30,30.657,28.657,32,27,32z"/>
+	<ellipse style="fill:#BCD269;" cx="15" cy="16" rx="6" ry="7"/>
+	<path style="fill:#D1DE8B;" d="M6,4c0,1.105-0.895,2-2,2S2,5.105,2,4s0.895-2,2-2S6,2.895,6,4z M26,26c-1.105,0-2,0.895-2,2
+		s0.895,2,2,2s2-0.895,2-2S27.105,26,26,26z M15,11c-1.657,0-3,1.343-3,3s1.343,3,3,3s3-1.343,3-3S16.657,11,15,11z M19,21
+		c0-1.657-1.343-3-3-3h-2c-1.657,0-3,1.343-3,3v0.207C12.062,22.318,13.461,23,15,23c1.539,0,2.938-0.682,4-1.793V21z"/>
+</g>
+</svg>

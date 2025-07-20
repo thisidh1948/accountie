@@ -1,0 +1,18 @@
+Create a New Page to Add/Update Transactions
+model: lib\models\record_model.dart
+to get the Icon wider use: lib\widgets\svg_icon_widgets.dart
+DataBase: cloud firestore
+
+
+FormFeilds:
+  final String recordId; //unique use: lib\util\generate_id.dart
+  final String account; //Dailog box: with icons of accounts collection -> in dailog display icon widget, bank name, accountNumber 
+  final String category; //Dailog box: with icons of categories collection -> in dailog display icon widget, category name
+  final String subCategory; //Dailog box: with icons of selected categorie.subcategories collection -> in dailog display icon widget, subcategory name
+  final String type; //Dailog box: with icons of selected categorie.subcategorie.items collection and also custom enter option-> in dailog display icon widget, subcategory name
+  final List<Item>? items; // Row Item(name: textfield, brand: textfield, quantiy: int, price: double, totalAmount: quantiy*price, tax: options[0.5, 1, 5, 15,18, 20, 25, 30, [custom] = totalAmount*option])
+  final double amount;  // custom | sum of items[totalAmount]
+  final DateTime transactionDate; // DatePicker , initialValue = DateTime.now()
+  final String? description; // TextField
+  final List<String>? tags; // Dailog box: with name of tags collection -> in dailog display tag name displayed on tag icon with random colors
+  final LocationModel? location; // should be auto picked from mobile or web where ever it is opened

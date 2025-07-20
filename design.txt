@@ -1,0 +1,146 @@
+Context: Planning to develop a finance expense tracker app we are still at designing face.
+Technology: Flutter (all os), NoSqlDataBase(FireStrore), Firebase Auth, Firebase Functions, Firebase Storage
+SignIn: GoogleAuth Sign And Email/Password Sign In
+Theme: Light and Dark Mode
+Table schemas: In designing phase
+    {
+  "transactionId": "UUID", // Unique identifier for the transaction (e.g., UUID instead of date/nanoseconds for better uniqueness and easier indexing)
+  "userId": "String",    // Essential for multi-user support (if applicable) or to tie to a user's account
+  "account": "String",   // e.g., "Cash", "Bank ABC - Savings", "Credit Card XYZ"
+  "type": "String",      // "income" or "expense" (more explicit than isCredit) 
+  "category": "String",  // e.g., "Food", "Transport", "Salary"
+  "subCategory": "String", // e.g., "Groceries", "Bus Fare", "Monthly Pay"
+  "amount": "Double",    // The total amount of the transaction
+  "currency": "String",  // e.g., "USD", "INR" - Crucial for international users
+  "transactionDate": "Timestamp", // Date and time of the transaction
+  "description": "String", // Similar to 'note' but more descriptive
+  "tags": ["String"],    // Array of tags, e.g., ["urgent", "travel", "work"]
+  "location": {          // Embedded document for location details
+    "latitude": "Double",
+    "longitude": "Double",
+    "name": "String"     // Optional: Human-readable location name (e.g., "Starbucks Coffee") should be Auto populated based on coordinates picked from Google Maps API or inbuilt flutter function
+  },
+  "paymentMethod": "String", // e.g., "Credit Card", "Debit Card", "Cash", "UPI"
+  "items": [             // Array of embedded item documents (if applicable for detailed expenses)
+    {
+      "name": "String",
+      "brand": "String", // Optional
+      "quantity": "Int",
+      "unitPrice": "Double", // Price per unit
+      "totalAmount": "Double" // quantity * unitPrice
+    }
+  ],
+  "loanId": "UUID", // Optional: Foreign key to a loan if this transaction is a loan payment
+  "receiptUrl": "String"   // Optional: Link to a stored receipt image
+}
+
+{
+  "loanId": "UUID",         // Unique identifier for the loan
+  "type": "String",         // "lent" or "borrowed" (more descriptive than isLent)
+  "partyName": "String",    // The person or entity involved (giver/taker combined)
+  "isEMI": "Boolean",       // Indicates if it's an EMI-based loan
+  "principalAmount": "Double",
+  "interestRate": "Double", // Stored as a percentage (e.g., 5.0 for 5%)
+  "currency": "String",     // Currency of the loan
+  "startDate": "Timestamp", // When the loan started
+  "compoundingFrequency": "String", // e.g., "monthly", "quarterly", "annually"
+  "repaymentFrequency": "String",   // e.g., "monthly", "weekly", "lumpsum"
+  "totalAmountPaid": "Double",      // Keep track of total paid for easy overview
+  "balanceAmount": "Double",        // Remaining balance
+  "status": "String",       // "active", "overdue", "closed", "default"
+  "notes": "String",
+  "installments": [         // Array of embedded installment documents
+    {
+      "installmentId": "UUID",    // Unique ID for the installment
+      "dueDate": "Timestamp",
+      "scheduledAmount": "Double",
+      "paidAmount": "Double",     // Amount actually paid for this installment
+      "paidDate": "Timestamp",    // When this installment was paid
+      "status": "String",         // "paid", "due", "overdue"
+      "transactionId": "UUID"     // Optional: Link to the transaction that paid this installment
+    }
+  ]
+}
+
+{
+  "accountId": "UUID",
+  "userId": "String",
+  "name": "String",          // e.g., "My Savings", "Credit Card - HDFC", "Cash"
+  "type": "String",          // e.g., "savings", "checking", "credit_card", "cash", "investment"
+  "balance": "Double",       // Current balance (can be derived/updated)
+  "currency": "String",
+  "bankName": "String",      // Optional, for bank accounts
+  "accountNumberMasked": "String", // Optional, last 4 digits
+  "creditLimit": "Double",   // For credit cards
+  "dueDate": "Int",          // Day of month for credit cards (e.g., 25th)
+  "billingCycleStartDay": "Int", // For credit cards, to define statement period
+  "isActive": "Boolean",     // true/false
+  "notes": "String",
+  "linkedBankId": "String" // Future: Integration with Plaid/Finicity/other bank APIs
+}
+
+categories
+{
+  "category": "string", //primarykey
+  "subcategories": List<subcategory> // e.g., "Food", "Transportation", "Salary"
+  "icon": "String",   // e.g., "food_icon.png" or a Unicode character
+  "color": "String",  // Hex code for charts
+}
+{
+  "subcategory": "String", // e.g., "Groceries", "Bus Fare", "Monthly Pay" //primarykey
+  "type": "String",   // "income", "expense"
+  "icon": "String",   // e.g., "food_icon.png" or a Unicode character
+  "color": "String",  // Hex code for charts
+}
+
+{
+  "budgetId": "UUID",
+  "name": "String",           // e.g., "Monthly Spending Budget", "Vacation Savings"          // "spending", "savings_goal", "debt_repayment_goal"
+  "period": "String",         // "monthly", "weekly", "annually", "custom"
+  "startDate": "Timestamp",
+  "endDate": "Timestamp",     // For fixed-period budgets/goals
+  "targetAmount": "Double",   // The total amount budgeted for the period/goal
+  "currentSpent": "Double",   // Derived: Sum of linked transactions
+  "currentSaved": "Double",   // Derived: Sum of linked savings transactions
+  "categoriesIncluded": ["categoriesNAme"], // Array of categoryIds linked to this budget
+  "accountsIncluded": ["accountName"], // Optional: Which accounts apply to this budget
+  "status": "String",         // "active", "completed", "archived"
+  "notes": "String"
+}
+
+{
+  "recurringTransactionId": "UUID",
+  "userId": "String",
+  "name": "String",           // e.g., "Netflix Subscription", "Salary"
+  "type": "String",           // "income", "expense"
+  "category": "String",       // Links to Category Name (or categoryId)
+  "amount": "Double",
+  "currency": "String",
+  "frequency": "String",      // "daily", "weekly", "bi-weekly", "monthly", "quarterly", "annually", "custom"
+  "startDate": "Timestamp",
+  "endDate": "Timestamp",     // Optional: For subscriptions that end
+  "nextOccurrenceDate": "Timestamp",
+  "notes": "String",
+  "status": "String"          // "active", "paused", "cancelled"
+}
+
+Requirement: want design better Table schema structure for the above tables with your expertise.
+
+
+create:
+CategoryPage(){
+  1. should list all the Categories avaible in the categories collection
+  2. Option to add the new categories(same AddDailog should be used for Edit also)
+  3. when click on the listed categories it should be open list of linked subcategories[subCategoryPage]
+  subCategoryPage(){
+  1. should list all the subCategories avaible in the List<subcategy> collection
+  2. Option to add the new subcategories (same AddDailog should be used for Edit also )
+  3. when click on the listed categories it should be open list of linked items[itemPage()]
+  itemPage(){
+  1. should list all the itmes avaible in the List<item> collection
+  2. Option to add the new subcategories (same AddDailog should be used for Edit also )
+  }
+  } }
+  Instructions: create common viewpage and (same AddDailog should be used for Edit also) to use as atemplate for all categories, subCategories, items, Accounts
+  Use the existing model: Category model and Account model
+  and also use the existing classes under path: D:\softwares\accountie\lib\widgets
