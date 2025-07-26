@@ -1,16 +1,21 @@
 // lib/services/data_service.dart
 import 'package:accountie/models/account_model.dart';
 import 'package:accountie/models/category_model.dart';
+import 'package:accountie/models/loan_model.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:accountie/models/record_model.dart';
 
 class DataService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  List<Record> _records = [];
   List<Category> _categories = [];
   List<Account> _accounts = [];
+  List<LoanModel> _loans = [];
   List<String> _tags = [];
   Map<String, dynamic> _settings = {};
+  
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -20,10 +25,15 @@ class DataService extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   Map<String, dynamic> get settings => _settings;
   List<String> get tags => _tags;
+  List<LoanModel> get loans => _loans;
 
   DataService() {
     fetchCategories();
+    getLoans();
+    getRecords();
   }
+
+  get records => _records;
 
   void setLoading(bool loading) {
     _isLoading = loading;
@@ -32,6 +42,9 @@ class DataService extends ChangeNotifier {
 
   Future<void> refreshAllData() async {
     await fetchCategories();
+    getLoans();
+    getRecords();
+    notifyListeners();
   }
 
   Category? getCategory(String name) {
@@ -145,5 +158,103 @@ Future<void> removeTag(String tag) async {
     _settings['tags'] = _tags.join(',');
     await addSettings('tags', _settings['tags']);
     notifyListeners();
+  }
+
+Future<void> getRecords() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final snapshot = await _firestore.collection('records').get();
+      _records = snapshot.docs
+          .map((doc) => Record.fromMap(doc.data(), doc.id))
+          .toList();
+      print('Fetched records successfully.');
+    } catch (e) {
+      print('Error fetching records: $e');
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+Future<void> addRecord(Record record, bool isUpdate) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      if (isUpdate) {
+        await _firestore.collection('records').doc(record.recordId).update(record.toMap());
+      } else {
+        await _firestore.collection('records').add(record.toMap());
+      }
+      print('Record ${isUpdate ? 'updated' : 'added'} successfully.');
+      if (isUpdate) {
+        _records[_records.indexWhere((r) => r.recordId == record.recordId)] = record;
+      } else {
+        _records.add(record);
+      }
+    } catch (e) {
+      print('Error ${isUpdate ? 'updating' : 'adding'} record: $e');
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+Future<void> getLoans()async {
+    _isLoading = true;
+    notifyListeners();
+    try { //Want to fetch all loans and their installments as well from Firestore
+      final snapshot = await _firestore.collection('loans').get();
+      _loans = snapshot.docs
+          .map((doc) => LoanModel.fromMap(doc.data(), doc.id))
+          .toList();
+      print("Fetched loans successfully.-----");
+      for (var loan in _loans) {
+        if (loan.installments.isEmpty) {
+          final installmentsSnapshot = await _firestore
+              .collection('loans')
+              .doc(loan.loanId)
+              .collection('installments')
+              .get();
+          loan.installments = installmentsSnapshot.docs
+              .map((doc) => Installment.fromMap(doc.data()))
+              .toList();
+        }
+      }
+      _loans.sort((a, b) => a.startDate.compareTo(b.startDate));
+      print('Fetched loans successfully.');
+    } catch (e) {
+      print('Error fetching loans: $e');
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+Future<void> addLoan(LoanModel loan, bool isUpdate) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      if (isUpdate) {
+        await _firestore.collection('loans').doc(loan.loanId).update(loan.toMap());
+      } else {
+        await _firestore.collection('loans').add(loan.toMap());
+      }
+      print('Loan ${isUpdate ? 'updated' : 'added'} successfully.');
+      if (isUpdate) {
+        _loans[_loans.indexWhere((l) => l.loanId == loan.loanId)] = loan;
+      } else {
+        _loans.add(loan);
+      }
+    } catch (e) {
+      print('Error ${isUpdate ? 'updating' : 'adding'} loan: $e');
+      _errorMessage = e.toString();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 }

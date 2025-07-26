@@ -1,0 +1,43 @@
+write a java logic based on this fields:
+  final bool isEMI;
+  final double principalAmount;
+  final double interestRate;
+  final DateTime startDate;
+  final DateTime closingDate;
+  final String compoundingFrequency; //options:  monthly, yearly
+  final String repaymentFrequency; //options:  monthly, yearly
+  final preClosingRate;
+  final predClosePerdiodInMonths;
+
+  double balanceAmount; //calculate
+  List<Installments> //calculate
+  double totalAmountPaid;  //calculate
+  date currentDate = DateTime.now();
+  double intersetPaidTillNow; //calculate
+
+  if (emi) {
+    //add all the Installments with status due and populate other fields as well
+  } else {
+
+  }
+
+
+  class Installment {
+    bool isEmi; //options: false means preclosing Amount or any other payments did to reduce the pa amount
+   String installmentId;
+   DateTime dueDate;
+   double scheduledAmount;
+   double amountMinusedFromPAFromthisPayment;
+   double interestPartInthisPAyemnt;
+   double paidAmount;
+   DateTime? paidDate;
+   String status;
+   String? transactionId; }
+
+    double pa = principalAmount;
+    double balAmount = 0.0;
+    installments.where((e) => e.isPaid && !e.isEmiPayment).forEach((e) {
+      e.interestComponent = e.scheduledAmount * (interestRate / 100);
+    });
+
+    not a emi, for loan which took loan we make some payments in between randomly. we store them in Installment[isEmiPayment=false, paidDate, paidAmount]. there can be mutilple payments in between. so we need to iterate through installments in date ascending order for first payment (if there) balanceAmount = principalAmount + interestComponent from now to strat date - paidAmount. for the next paid installment balanceAmount = balanceAmount + interestComponent from last paidDate to now - paidAmount. when balanceAmount =0 status = paid

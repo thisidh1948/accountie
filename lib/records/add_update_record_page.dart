@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:accountie/models/structure.dart';
 import 'package:accountie/records/selection_dialog.dart';
 import 'package:accountie/records/multi_select_tag_dialog.dart';
@@ -9,12 +11,14 @@ import 'package:accountie/widgets/credit_debit_toggle.dart';
 import 'package:accountie/widgets/location_service.dart';
 import 'package:accountie/widgets/svg_icon_widgets.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart' as kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
+import 'package:http/http.dart' as http;
 
 class AddRecordDialogPage extends StatefulWidget {
   final Record? initialRecord;
@@ -88,7 +92,7 @@ class _AddRecordDialogPage extends State<AddRecordDialogPage> {
     super.dispose();
   }
 
-  Future<void> _saveRecord() async {
+  Future<void> _saveRecord(DataService dataService) async {
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
 
@@ -115,18 +119,12 @@ class _AddRecordDialogPage extends State<AddRecordDialogPage> {
                 : null;
 
         if (widget.initialRecord == null) {
-          await FirebaseFirestore.instance
-              .collection('records')
-              .doc(currentRecord!.recordId)
-              .set(currentRecord!.toMap());
+          dataService.addRecord(currentRecord!, false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Record added successfully!')),
           );
         } else {
-          await FirebaseFirestore.instance
-              .collection('records')
-              .doc(currentRecord!.recordId)
-              .update(currentRecord!.toMap());
+          dataService.addRecord(currentRecord!, true);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Record updated successfully!')),
           );
@@ -155,7 +153,7 @@ class _AddRecordDialogPage extends State<AddRecordDialogPage> {
     // Resolve Account from cached data
     if (currentRecord?.account != null) {
       final account = dataService.accounts.firstWhere(
-        (acc) => acc.accountholder == currentRecord?.account,
+        (acc) => acc.accountNumber == currentRecord?.account,
         orElse: () => null as Account, // Handle not found case
       );
       if (account != null) {
@@ -238,78 +236,88 @@ class _AddRecordDialogPage extends State<AddRecordDialogPage> {
     return null; // For now, only hex is assumed.
   }
 
-Future<void> _pickLocationAutomatically() async {
+  Future<void> _pickLocationAutomatically() async {
   Position? position = await LocationService.getCurrentLocation();
 
-  if (position != null) {
-    String cityName = '';
-    String areaName = '';
-    int pincode = 0;
-
-    debugPrint('Attempting reverse geocoding for: ${position.latitude}, ${position.longitude}');
-
-    try {
-      debugPrint('Calling placemarkFromCoordinates...');
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
-      debugPrint('placemarkFromCoordinates returned.'); // <-- If you see this, the call itself succeeded.
-
-      if (placemarks.isNotEmpty) {
-        Placemark place = placemarks.first;
-        debugPrint('Accessed placemarks.first. Now checking its properties...');
-
-        // Add comprehensive debug prints for ALL properties of Placemark
-        debugPrint('--- Placemark Data for Diagnosis ---');
-        debugPrint('  name: ${place.name}');
-        debugPrint('  street: ${place.street}');
-        debugPrint('  isoCountryCode: ${place.isoCountryCode}');
-        debugPrint('  country: ${place.country}');
-        debugPrint('  postalCode: ${place.postalCode}');
-        debugPrint('  administrativeArea: ${place.administrativeArea}');
-        debugPrint('  subAdministrativeArea: ${place.subAdministrativeArea}');
-        debugPrint('  locality: ${place.locality}');
-        debugPrint('  subLocality: ${place.subLocality}');
-        debugPrint('  thoroughfare: ${place.thoroughfare}');
-        debugPrint('  subThoroughfare: ${place.subThoroughfare}');
-        debugPrint('--- End Placemark Data ---');
-
-        cityName = place.locality ?? place.subAdministrativeArea ?? '';
-        areaName = place.subLocality ?? place.locality ?? '';
-
-        String fetchedPostalCode = place.postalCode ?? '';
-        if (fetchedPostalCode.isNotEmpty) {
-          pincode = int.tryParse(fetchedPostalCode) ?? 0;
-        }
-
-        debugPrint('CityName assigned: $cityName');
-        debugPrint('AreaName assigned: $areaName');
-        debugPrint('Pincode assigned: $pincode');
-
-      } else {
-        debugPrint('Geocoding returned an empty list of placemarks for ${position.latitude}, ${position.longitude}.');
-      }
-    } on PlatformException catch (e) {
-      debugPrint('PLATFORM EXCEPTION during reverse geocoding: Code: ${e.code}, Message: ${e.message}, Details: ${e.details}');
-    } catch (e) {
-      debugPrint('GENERIC CATCH during reverse geocoding: $e'); // <-- This is the one we're looking for
-    }
-
-    setState(() {
-      currentRecord?.location = LocationModel(
-        cityName: cityName,
-        areaName: areaName,
-        pincode: pincode,
-      );
-    });
-
-  } else {
-    debugPrint('Failed to get current location. Position was null.');
+  if (position == null) {
+    debugPrint('Failed to get current location. Position is null.');
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Could not get your current location. Please check permissions.')),
     );
+    return;
   }
+
+  debugPrint('Current Location: ${position.latitude}, ${position.longitude}');
+
+  String cityName = '';
+  String areaName = '';
+  int pincode = 0;
+
+  if (kIsWeb.kIsWeb) {
+    debugPrint('🏷️ Running on Web—using REST API for reverse geocoding.');
+    try {
+      final apiKey = '884b2096dcab4391a1eadeb6d3b273d5';
+      final url =
+          Uri.parse('https://api.opencagedata.com/geocode/v1/json?q=${position.latitude}+${position.longitude}&key=$apiKey');
+
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final results = data['results'] as List<dynamic>;
+        if (results.isNotEmpty) {
+          final components = results[0]['components'];
+          cityName = components['city'] ??
+              components['town'] ??
+              components['village'] ??
+              components['county'] ??
+              '';
+          areaName = components['suburb'] ??
+              components['neighbourhood'] ??
+              components['hamlet'] ??
+              '';
+          final postal = components['postcode']?.toString() ?? '';
+          pincode = int.tryParse(postal) ?? 0;
+
+          debugPrint('🔍 Web API result: city="$cityName", area="$areaName", pincode=$pincode');
+        } else {
+          debugPrint('Web API returned no results.');
+        }
+      } else {
+        debugPrint('Web API error: ${response.statusCode} ${response.reasonPhrase}');
+      }
+    } catch (e) {
+      debugPrint('Error calling reverse-geocode API: $e');
+    }
+  } else {
+    debugPrint('🏷️ Running on Mobile—using placemarkFromCoordinates.');
+    try {
+      final placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        debugPrint(
+            'Placemark: locality=${p.locality}, subLocality=${p.subLocality}, postalCode=${p.postalCode}');
+
+        cityName = p.locality ?? p.subAdministrativeArea ?? '';
+        areaName = p.subLocality ?? p.locality ?? '';
+        pincode = int.tryParse(p.postalCode ?? '') ?? 0;
+      } else {
+        debugPrint('No placemarks found.');
+      }
+    } catch (e) {
+      debugPrint('Reverse geocoding failed on mobile: $e');
+    }
+  }
+
+  setState(() {
+    currentRecord?.location = LocationModel(
+      cityName: cityName,
+      areaName: areaName,
+      pincode: pincode,
+    );
+  });
 }
 
   @override
@@ -378,6 +386,7 @@ Future<void> _pickLocationAutomatically() async {
                   );
                   if (pickedAccount != null) {
                     setState(() {
+                      currentRecord?.account = pickedAccount.accountNumber;
                       _selectedAccount = pickedAccount;
                       _selectedAccountName = pickedAccount.accountholder;
                     });
@@ -444,6 +453,7 @@ Future<void> _pickLocationAutomatically() async {
                           setState(() {
                             _selectedSubCategory = pickedSubCategory;
                             currentRecord?.subCategory = pickedSubCategory.name;
+                            currentRecord?.type = pickedSubCategory.type;
                             _type = pickedSubCategory.type;
                             _subCatItems = pickedSubCategory.items ?? [];
                           });
@@ -498,7 +508,7 @@ Future<void> _pickLocationAutomatically() async {
                   ),
                 ],
               ),
-              //Amount Input
+              //Amount Input //credit-debit
               const SizedBox(height: 8),
               // Transaction Date
               TextFormField(
@@ -626,7 +636,7 @@ Future<void> _pickLocationAutomatically() async {
               // Save Button
               Center(
                 child: ElevatedButton(
-                  onPressed: _isSaving ? null : _saveRecord,
+                  onPressed: _isSaving ? null : () => _saveRecord(dataService),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 40, vertical: 15),

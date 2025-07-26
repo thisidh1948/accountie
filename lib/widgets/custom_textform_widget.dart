@@ -2,27 +2,40 @@ import 'package:flutter/material.dart';
 
 class CustomTextFormWidget extends StatelessWidget {
   final String label;
-  final TextEditingController textController;
+  final TextEditingController? textController;
+  final String? initialValue;
   final Icon icon;
   final TextInputType keyboardType;
   final String? Function(String?)? validator;
   final int? maxLines;
+  final void Function(String?)? onSaved;
+  final void Function(String)? onChanged;
 
   const CustomTextFormWidget({
     super.key,
     required this.label,
-    required this.textController,
+    this.textController,
+    this.initialValue,
     required this.icon,
     this.keyboardType = TextInputType.text,
     this.validator,
-    this.maxLines = 1, // Default to 1 line
-  });
+    this.maxLines = 1,
+    this.onSaved,
+    this.onChanged,
+  }) : assert(
+         textController == null || initialValue == null,
+         'Provide either a controller or an initialValue, not both.',
+       );
 
   @override
   Widget build(BuildContext context) {
     return TextFormField(
       controller: textController,
-      decoration: itemFormFieldDecor(context, // <-- Pass BuildContext here
+      initialValue: textController == null ? initialValue : null,
+      onSaved: onSaved,
+      onChanged: onChanged,
+      decoration: itemFormFieldDecor(
+        context,
         labelText: label,
         hintText: 'Enter $label',
         prefixIcon: icon.icon,
@@ -32,7 +45,6 @@ class CustomTextFormWidget extends StatelessWidget {
       textInputAction: TextInputAction.next,
       validator: validator ??
           (value) {
-            // Use provided validator or a default one
             if (value == null || value.isEmpty) {
               return 'Please enter $label';
             }
@@ -44,14 +56,11 @@ class CustomTextFormWidget extends StatelessWidget {
 }
 
 InputDecoration itemFormFieldDecor(
-  BuildContext context, // <-- BuildContext still passed as a required parameter
-  {
+  BuildContext context, {
     String labelText = 'Item',
     String? hintText,
     IconData? prefixIcon,
-    // You can add more customizable parameters here if needed
-  }
-) {
+}) {
   return InputDecoration(
     labelText: labelText,
     hintText: hintText,
