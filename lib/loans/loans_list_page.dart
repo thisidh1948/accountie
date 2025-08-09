@@ -6,6 +6,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 class LoansListPage extends StatelessWidget {
+  const LoansListPage({super.key});
+
   @override
   Widget build(BuildContext context) {
     final dataService = Provider.of<DataService>(context);

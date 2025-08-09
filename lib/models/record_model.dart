@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-class Record {
+class TRecord {
    String recordId;
    String account;
    bool type;
@@ -16,7 +16,7 @@ class Record {
    String? loanId;
    String? receiptUrl;
 
-  Record({
+  TRecord({
     required this.recordId,
     required this.account,
     required this.type,
@@ -33,8 +33,8 @@ class Record {
     this.receiptUrl,
   });
 
-  factory Record.fromMap(Map<String, dynamic> map, String id) {
-    return Record(
+  factory TRecord.fromMap(Map<String, dynamic> map, String id) {
+    return TRecord(
       recordId: id,
       account: map['account'],
       type: map['type'] == 'credit', // Assuming type is stored as 'credit' or 'debit'

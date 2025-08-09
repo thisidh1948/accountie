@@ -9,7 +9,7 @@ import 'package:accountie/models/record_model.dart';
 class DataService extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  List<Record> _records = [];
+  List<TRecord> _records = [];
   List<Category> _categories = [];
   List<Account> _accounts = [];
   List<LoanModel> _loans = [];
@@ -162,11 +162,10 @@ Future<void> removeTag(String tag) async {
 
 Future<void> getRecords() async {
     _isLoading = true;
-    notifyListeners();
     try {
       final snapshot = await _firestore.collection('records').get();
       _records = snapshot.docs
-          .map((doc) => Record.fromMap(doc.data(), doc.id))
+          .map((doc) => TRecord.fromMap(doc.data(), doc.id))
           .toList();
       print('Fetched records successfully.');
     } catch (e) {
@@ -178,7 +177,7 @@ Future<void> getRecords() async {
     }
   }
 
-Future<void> addRecord(Record record, bool isUpdate) async {
+Future<void> addRecord(TRecord record, bool isUpdate) async {
     _isLoading = true;
     notifyListeners();
     try {

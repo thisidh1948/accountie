@@ -1,11 +1,13 @@
 import 'package:accountie/categories/accounts_page.dart';
 import 'package:accountie/categories/categories_page.dart';
 import 'package:accountie/categories/tags_page.dart';
+import 'package:accountie/home/dash_board.dart';
 import 'package:accountie/loans/loans_list_page.dart';
 import 'package:accountie/records/add_update_record_page.dart';
 import 'package:accountie/records/records_view_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
 // PlaceholderPage if you still need it for other buttons
 class PlaceholderPage extends StatelessWidget {
   final String title;
@@ -57,7 +59,7 @@ List<Map<String, dynamic>> getAllNavigationItems(BuildContext context) {
     {
       'label': 'Manage Products',
       'icon': Icons.inventory_2_outlined,
-      'destinationPage': const PlaceholderPage(title: 'Report an Incident'),
+      'destinationPage': const HomePage(),
       'iconColor': Colors.orange,
       'cardColor': Colors.orange.shade100,
       'subtitle': 'Manage inventory and items',

@@ -20,17 +20,17 @@ class FirestoreService {
   }
 
   // Transaction CRUD
-  Future<void> addTransaction(Record tx) async {
+  Future<void> addTransaction(TRecord tx) async {
     await _db.collection('records').doc(tx.recordId).set(tx.toMap());
   }
 
-  Stream<List<Record>> getRecords(String userId) {
+  Stream<List<TRecord>> getRecords(String userId) {
     return _db
         .collection('records')
         .orderBy('transactionDate', descending: true)
         .snapshots()
         .map((snapshot) => snapshot.docs
-            .map((doc) => Record.fromMap(doc.data(), doc.id))
+            .map((doc) => TRecord.fromMap(doc.data(), doc.id))
             .toList());
   }
 

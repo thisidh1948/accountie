@@ -10,7 +10,6 @@ import 'package:accountie/services/data_service.dart';
 import 'package:accountie/widgets/credit_debit_toggle.dart';
 import 'package:accountie/widgets/location_service.dart';
 import 'package:accountie/widgets/svg_icon_widgets.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart' as kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,7 +20,7 @@ import 'package:uuid/uuid.dart';
 import 'package:http/http.dart' as http;
 
 class AddRecordDialogPage extends StatefulWidget {
-  final Record? initialRecord;
+  final TRecord? initialRecord;
 
   const AddRecordDialogPage({super.key, this.initialRecord});
   @override
@@ -34,7 +33,7 @@ class _AddRecordDialogPage extends State<AddRecordDialogPage> {
   final _descriptionController = TextEditingController();
   var _amountController = TextEditingController();
 
-  Record? currentRecord; // To hold the initial record if editing
+  TRecord? currentRecord; // To hold the initial record if editing
   List<String> selectedTags = [];
   Account? _selectedAccount; // To store the full selected Account object
   Category? _selectedCategory;
@@ -58,7 +57,7 @@ class _AddRecordDialogPage extends State<AddRecordDialogPage> {
       _type = currentRecord?.type ?? false;
       _resolveInitialData();
     } else {
-      currentRecord = Record(
+      currentRecord = TRecord(
         recordId: uuid.v4(),
         transactionDate: DateTime.now(),
         items: [],
@@ -237,88 +236,93 @@ class _AddRecordDialogPage extends State<AddRecordDialogPage> {
   }
 
   Future<void> _pickLocationAutomatically() async {
-  Position? position = await LocationService.getCurrentLocation();
+    Position? position = await LocationService.getCurrentLocation();
 
-  if (position == null) {
-    debugPrint('Failed to get current location. Position is null.');
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Could not get your current location. Please check permissions.')),
-    );
-    return;
-  }
-
-  debugPrint('Current Location: ${position.latitude}, ${position.longitude}');
-
-  String cityName = '';
-  String areaName = '';
-  int pincode = 0;
-
-  if (kIsWeb.kIsWeb) {
-    debugPrint('🏷️ Running on Web—using REST API for reverse geocoding.');
-    try {
-      final apiKey = '884b2096dcab4391a1eadeb6d3b273d5';
-      final url =
-          Uri.parse('https://api.opencagedata.com/geocode/v1/json?q=${position.latitude}+${position.longitude}&key=$apiKey');
-
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final results = data['results'] as List<dynamic>;
-        if (results.isNotEmpty) {
-          final components = results[0]['components'];
-          cityName = components['city'] ??
-              components['town'] ??
-              components['village'] ??
-              components['county'] ??
-              '';
-          areaName = components['suburb'] ??
-              components['neighbourhood'] ??
-              components['hamlet'] ??
-              '';
-          final postal = components['postcode']?.toString() ?? '';
-          pincode = int.tryParse(postal) ?? 0;
-
-          debugPrint('🔍 Web API result: city="$cityName", area="$areaName", pincode=$pincode');
-        } else {
-          debugPrint('Web API returned no results.');
-        }
-      } else {
-        debugPrint('Web API error: ${response.statusCode} ${response.reasonPhrase}');
-      }
-    } catch (e) {
-      debugPrint('Error calling reverse-geocode API: $e');
-    }
-  } else {
-    debugPrint('🏷️ Running on Mobile—using placemarkFromCoordinates.');
-    try {
-      final placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
+    if (position == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text(
+                'Could not get your current location. Please check permissions.')),
       );
-      if (placemarks.isNotEmpty) {
-        final p = placemarks.first;
-        debugPrint(
-            'Placemark: locality=${p.locality}, subLocality=${p.subLocality}, postalCode=${p.postalCode}');
-
-        cityName = p.locality ?? p.subAdministrativeArea ?? '';
-        areaName = p.subLocality ?? p.locality ?? '';
-        pincode = int.tryParse(p.postalCode ?? '') ?? 0;
-      } else {
-        debugPrint('No placemarks found.');
-      }
-    } catch (e) {
-      debugPrint('Reverse geocoding failed on mobile: $e');
+      return;
     }
-  }
 
-  setState(() {
-    currentRecord?.location = LocationModel(
-      cityName: cityName,
-      areaName: areaName,
-      pincode: pincode,
-    );
-  });
-}
+    debugPrint('Current Location: ${position.latitude}, ${position.longitude}');
+
+    String cityName = '';
+    String areaName = '';
+    int pincode = 0;
+
+    if (kIsWeb.kIsWeb) {
+      debugPrint('🏷️ Running on Web—using REST API for reverse geocoding.');
+      try {
+        final apiKey = '884b2096dcab4391a1eadeb6d3b273d5';
+        if (position != null) {
+          String cityName = '';
+          String areaName = '';
+          int pincode = 0;
+
+          debugPrint(
+              'Attempting reverse geocoding for: \\${position.latitude}, \\${position.longitude}');
+
+          try {
+            debugPrint('Calling placemarkFromCoordinates...');
+            List<Placemark> placemarks = await placemarkFromCoordinates(
+              position.latitude,
+              position.longitude,
+            );
+            debugPrint('placemarkFromCoordinates returned.');
+
+            if (placemarks.isNotEmpty) {
+              Placemark place = placemarks.first;
+              cityName = place.locality ?? place.subAdministrativeArea ?? '';
+              areaName = place.subLocality ?? place.locality ?? '';
+              String fetchedPostalCode = place.postalCode ?? '';
+              if (fetchedPostalCode.isNotEmpty) {
+                pincode = int.tryParse(fetchedPostalCode) ?? 0;
+              }
+              debugPrint('CityName assigned: $cityName');
+              debugPrint('AreaName assigned: $areaName');
+              debugPrint('Pincode assigned: $pincode');
+            } else {
+              debugPrint(
+                  'Geocoding returned an empty list of placemarks for \\${position.latitude}, \\${position.longitude}.');
+            }
+          } on PlatformException catch (e) {
+            debugPrint(
+                'PLATFORM EXCEPTION during reverse geocoding: Code: \\${e.code}, Message: \\${e.message}, Details: \\${e.details}');
+          } catch (e) {
+            debugPrint('GENERIC CATCH during reverse geocoding: $e');
+          }
+          if (!mounted) return;
+          setState(() {
+            currentRecord?.location = LocationModel(
+              cityName: cityName,
+              areaName: areaName,
+              pincode: pincode,
+            );
+          });
+        } else {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+                content: Text(
+                    'Could not get your current location. Please check permissions.')),
+          );
+        }
+      } catch (e) {
+        debugPrint('Reverse geocoding failed on mobile: $e');
+      }
+    }
+
+    setState(() {
+      currentRecord?.location = LocationModel(
+        cityName: cityName,
+        areaName: areaName,
+        pincode: pincode,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -479,7 +483,6 @@ class _AddRecordDialogPage extends State<AddRecordDialogPage> {
                         prefixIcon: const Icon(Icons.attach_money),
                       ),
                       keyboardType: TextInputType.number,
-                      readOnly: _isAmountCalculatedFromItems,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
                           return 'Please enter an amount';
@@ -696,47 +699,46 @@ class _AddRecordDialogPage extends State<AddRecordDialogPage> {
         padding: const EdgeInsets.all(8.0),
         child: Column(
           children: [
-            Row(children: [ 
-                ElevatedButton(
-                  onPressed: () async {
-                    final Structure? picketItem = await showDialog<Structure>(
-                      context: context,
-                      builder: (context) => SelectionDialog<Structure>(
-                        title: 'Select Item',
-                        items: _subCatItems, // Get categories from DataService
-                        itemBuilder: (category) =>
-                            category.icon != null && category.icon!.isNotEmpty
-                                ? SvgIconWidget(
-                                    iconFileName: category.icon!,
-                                    width: 24,
-                                    height: 24)
-                                : Icon(Icons.category, color: Colors.grey),
-                        itemToString: (item) => item.name ?? 'Unnamed Category',
-                      ),
-                    );
-                    if (picketItem != null) {
-                      setState(() {
-                        currentRecord!.items![index].name = picketItem.name;
-                      });
-                    }
-                  },
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SvgIconWidget(
-                          iconFileName: structItem.icon ?? item.name ?? 'NA'),
-                    ],
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.zero, // <-- Remove all default padding
-                    minimumSize: Size
-                        .zero, // <-- Allow the button to be as small as its child
-                    tapTargetSize: MaterialTapTargetSize
-                        .shrinkWrap,
-                    shadowColor: Colors.transparent,
-                    splashFactory: NoSplash.splashFactory,
-                  ),
-                ),             
+            Row(children: [
+              ElevatedButton(
+                onPressed: () async {
+                  final Structure? picketItem = await showDialog<Structure>(
+                    context: context,
+                    builder: (context) => SelectionDialog<Structure>(
+                      title: 'Select Item',
+                      items: _subCatItems, // Get categories from DataService
+                      itemBuilder: (category) =>
+                          category.icon != null && category.icon!.isNotEmpty
+                              ? SvgIconWidget(
+                                  iconFileName: category.icon!,
+                                  width: 24,
+                                  height: 24)
+                              : Icon(Icons.category, color: Colors.grey),
+                      itemToString: (item) => item.name ?? 'Unnamed Category',
+                    ),
+                  );
+                  if (picketItem != null) {
+                    setState(() {
+                      currentRecord!.items![index].name = picketItem.name;
+                    });
+                  }
+                },
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SvgIconWidget(
+                        iconFileName: structItem.icon ?? item.name ?? 'NA'),
+                  ],
+                ),
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.zero, // <-- Remove all default padding
+                  minimumSize: Size
+                      .zero, // <-- Allow the button to be as small as its child
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  shadowColor: Colors.transparent,
+                  splashFactory: NoSplash.splashFactory,
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 flex: 3,

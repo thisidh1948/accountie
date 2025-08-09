@@ -10,7 +10,7 @@ class RecordListPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final dataService = Provider.of<DataService>(context);
-    final records = List<Record>.from(dataService.records)
+    final records = List<TRecord>.from(dataService.records)
       ..sort((a, b) => b.transactionDate.compareTo(a.transactionDate));
 
     return Scaffold(
@@ -32,7 +32,7 @@ class RecordListPage extends StatelessWidget {
     );
   }
 
-  Widget _buildRecordTile(Record record) {
+  Widget _buildRecordTile(TRecord record) {
     final isCredit = record.type;
     final color = isCredit ? Colors.green : Colors.red;
     final amountPrefix = isCredit ? '+' : '-';
@@ -79,7 +79,7 @@ class RecordListPage extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader(Record record) {
+  Widget _buildHeader(TRecord record) {
     final dateStr = DateFormat('dd MMM yyyy, hh:mm a').format(record.transactionDate);
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
