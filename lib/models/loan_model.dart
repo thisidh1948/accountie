@@ -70,7 +70,7 @@ class LoanModel {
   Map<String, dynamic> toMap() {
     return {
       'isGiven': isGiven,
-      if(isEmi) 'isEmi': isEmi,
+      if (isEmi) 'isEmi': isEmi,
       'partyName': partyName,
       'principalAmount': principalAmount,
       'interestRate': interestRate,
@@ -105,118 +105,96 @@ class LoanModel {
   }
 
   get TotalDue {
-    return installments
-        .where((e) => !e.isPaid)
-        .fold(0.0, (sum, e) => sum + e.scheduledAmount);
+    return principalAmount - TotalPrincipalPaid;
   }
 
   int get daysInLoan {
     return startDate.difference(DateTime.now()).inDays;
   }
 
-void payment(double amount, DateTime paymentDate) {
-  DateTime lastDate = startDate;
-
-  if (installments.isNotEmpty && installments.any((i) => i.isPaid)) {
-    lastDate = installments
-        .where((i) => i.isPaid)
-        .map((i) => i.paidDate ?? startDate)
-        .fold(startDate, (a, b) => a.isAfter(b) ? a : b);
+  void recalculateFromScratch() {
+    balanceAmount = principalAmount;
+    List<Installment> cpInstallments = List.from(installments);
+    installments.clear();
+    cpInstallments.sort(
+        (a, b) => (a.paidDate ?? startDate).compareTo(b.paidDate ?? startDate));
+    for (final inst in cpInstallments.where((e) => e.isPaid)) {
+      payment(inst.paidAmount ?? 0.0, inst.paidDate ?? DateTime.now());
+    }
   }
 
-  final days = paymentDate.difference(lastDate).inDays;
-  double interest = 0.0;
+  void payment(double amount, DateTime paymentDate) {
+    double interest = calculateCurrentInterest(referenceDate: paymentDate);
+    final interestComponent = double.parse(interest.toStringAsFixed(2));
+    final principalComponent = double.parse((amount - interestComponent)
+        .clamp(0, balanceAmount)
+        .toStringAsFixed(2));
 
-  if (days > 365) {
-    int years = (days / 365).floor();
-    int remainingDays = days % 365;
-    double compounded = balanceAmount * pow(1 + (interestRate / 100), years);
-    double remainingInterest = compounded * (interestRate / 100) * (remainingDays / 365);
-    interest = (compounded + remainingInterest) - balanceAmount;
-  } else {
-    // Simple interest for remaining days
-    interest = (balanceAmount * (interestRate / 100)) * (days / 365);
+    balanceAmount = balanceAmount + interestComponent - amount;
+    balanceAmount =
+        balanceAmount < 0 ? 0 : double.parse(balanceAmount.toStringAsFixed(2));
+
+    print('intersetComp: ${interestComponent.toStringAsFixed(2)}');
+    print('principalComp: ${principalComponent.toStringAsFixed(2)}');
+    print('balanceAmount: ${balanceAmount.toStringAsFixed(2)}');
+    
+    installments.add(Installment(
+      installmentId: 'PAY-${installments.length + 1}',
+      interestComponent: (amount > interestComponent) ? interestComponent : amount,
+      principalComponent: principalComponent,
+      paidAmount: amount,
+      paidDate: paymentDate,
+      isPaid: true,
+      transactionId: null,
+    ));
+
+    if (balanceAmount <= 0) {
+      isOpen = false;
+    }
   }
 
-  final interestComponent = double.parse(interest.toStringAsFixed(2));
-  final principalComponent =
-      double.parse((amount - interestComponent).clamp(0, balanceAmount).toStringAsFixed(2));
+  double calculateCurrentInterest({DateTime? referenceDate}) {
+    DateTime lastDate = startDate;
 
-  balanceAmount = balanceAmount + interestComponent - amount;
-  balanceAmount = balanceAmount < 0 ? 0 : double.parse(balanceAmount.toStringAsFixed(2));
+    if (installments.isNotEmpty && installments.any((i) => i.isPaid)) {
+      lastDate = installments
+          .where((i) => i.isPaid)
+          .map((i) => i.paidDate ?? startDate)
+          .fold(startDate, (a, b) => a.isAfter(b) ? a : b);
+    }
 
-  installments.add(Installment(
-    installmentId: 'PAY-${installments.length + 1}',
-    scheduledAmount: interestComponent + principalComponent,
-    interestComponent: interestComponent,
-    principalComponent: principalComponent,
-    paidAmount: amount,
-    paidDate: paymentDate,
-    isPaid: true,
-    transactionId: null,
-  ));
+    final days = (referenceDate ?? DateTime.now()).difference(lastDate).inDays;
+    double interest = 0.0;
 
-  if (balanceAmount <= 0) {
-    isOpen = false;
+    print(days);
+
+    if (days > 365) {
+      int years = (days / 365).floor();
+      int remainingDays = days % 365;
+      double compounded = balanceAmount * pow(1 + (interestRate / 100), years);
+      double remainingInterest =
+          compounded * (interestRate / 100) * (remainingDays / 365);
+      interest = (compounded + remainingInterest) - balanceAmount;
+    } else {
+      interest = (balanceAmount * (interestRate / 100)) * (days / 365);
+    }
+    return double.parse(interest.toStringAsFixed(2));
   }
-}
-
-void recalculateFromScratch() {
-  balanceAmount = principalAmount;
-  installments.sort((a, b) => (a.paidDate ?? startDate).compareTo(b.paidDate ?? startDate));
-
-  final List<Installment> updated = [];
-  for (final inst in installments.where((e) => e.isPaid)) {
-    payment(inst.paidAmount ?? 0.0, inst.paidDate ?? startDate);
-  }
-}
-
-void addInstallment(Installment inst) {
-  installments.add(inst);
-}
-
-double calculateCurrentInterest({DateTime? referenceDate}) {
-  DateTime lastDate = startDate;
-
-  if (installments.isNotEmpty && installments.any((i) => i.isPaid)) {
-    lastDate = installments
-        .where((i) => i.isPaid)
-        .map((i) => i.paidDate ?? startDate)
-        .fold(startDate, (a, b) => a.isAfter(b) ? a : b);
-  }
-
-  final days = (referenceDate ?? DateTime.now()).difference(lastDate).inDays;
-  double interest = 0.0;
-
-  if (days > 365) {
-    int years = (days / 365).floor();
-    int remainingDays = days % 365;
-    double compounded = balanceAmount * pow(1 + (interestRate / 100), years);
-    double remainingInterest = compounded * (interestRate / 100) * (remainingDays / 365);
-    interest = (compounded + remainingInterest) - balanceAmount;
-  } else {
-    interest = (balanceAmount * (interestRate / 100)) * (days / 365);
-  }
-
-  return double.parse(interest.toStringAsFixed(2));
-}
 }
 
 class Installment {
   String installmentId;
-  double scheduledAmount;
   double interestComponent;
   double principalComponent;
-  double? paidAmount;
+  double paidAmount;
   DateTime? paidDate;
   bool isPaid;
   String? transactionId;
 
   Installment({
     required this.installmentId,
-    required this.scheduledAmount,
     required this.isPaid,
-    this.paidAmount,
+    required this.paidAmount,
     this.paidDate,
     this.transactionId,
     this.interestComponent = 0.0,
@@ -226,7 +204,6 @@ class Installment {
   factory Installment.fromMap(Map<String, dynamic> map) {
     return Installment(
       installmentId: map['installmentId'],
-      scheduledAmount: (map['scheduledAmount'] as num).toDouble(),
       paidAmount: (map['paidAmount'] as num).toDouble(),
       paidDate: map['paidDate'] != null
           ? (map['paidDate'] as Timestamp).toDate()
@@ -245,7 +222,6 @@ class Installment {
   Map<String, dynamic> toMap() {
     return {
       'installmentId': installmentId,
-      'scheduledAmount': scheduledAmount,
       'paidAmount': paidAmount,
       'paidDate': paidDate != null ? Timestamp.fromDate(paidDate!) : null,
       'isPaid': isPaid,

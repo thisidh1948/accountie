@@ -1,9 +1,11 @@
+import 'package:accountie/services/data_service.dart';
 import 'package:accountie/widgets/color_picker.dart';
+import 'package:accountie/widgets/custom_textform_widget.dart';
 import 'package:accountie/widgets/icon_picker_widget.dart';
 import 'package:accountie/widgets/credit_debit_toggle.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:accountie/models/category_model.dart';
+import 'package:provider/provider.dart';
 
 class AddSubCategoryDialog extends StatefulWidget {
   final String categoryId;
@@ -17,27 +19,31 @@ class AddSubCategoryDialog extends StatefulWidget {
 
 class _AddSubCategoryDialogState extends State<AddSubCategoryDialog> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _nameController;
-  bool _type = false;
+  late SubCategory currSubCategory;
+  bool _isUpdate = false;
   String? _icon;
-  String? _color;
-  int _index = 0;
   bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
-    final subcat = widget.initialSubCategory;
-    _nameController = TextEditingController(text: subcat?.name ?? '');
-    _type = subcat?.type?? false; // Default to false if not provided
-    _icon = subcat?.icon ?? '';
-    _color = subcat?.color ?? '0xFF9E9E9E';
-    _index = subcat?.index ?? 0;
+    if (widget.initialSubCategory != null) {
+      _isUpdate = true;
+      currSubCategory = widget.initialSubCategory!;
+    } else {
+      currSubCategory = SubCategory(
+        name: '',
+        type: false,
+        icon: '',
+        color: '0xFF9E9E9E',
+        index: 0,
+        items: [],
+      );
+    }
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
     super.dispose();
   }
 
@@ -48,26 +54,19 @@ class _AddSubCategoryDialogState extends State<AddSubCategoryDialog> {
         _isSaving = true;
       });
       try {
-        final subcat = SubCategory(
-          name: _nameController.text.trim(),
-          type: _type,
-          icon: _icon?.trim() ?? '',
-          color: _color?.trim() ?? '',
-          items: [],
-          index: _index,
-        );
-        final ref = FirebaseFirestore.instance
-            .collection('categories')
-            .doc(widget.categoryId)
-            .collection('subcategories');
-        await ref.doc(subcat.name).set(subcat.toMap());
+       final dataService = Provider.of<DataService>(context, listen: false);
+        await dataService.handleSubCategory(
+            currSubCategory,
+            widget.categoryId,
+            currSubCategory.name,
+            _isUpdate,
+            false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(widget.initialSubCategory == null
                   ? 'Subcategory added successfully!'
                   : 'Subcategory updated successfully!')),
         );
-        Navigator.of(context).pop();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error saving subcategory: ${e.toString()}')),
@@ -76,6 +75,7 @@ class _AddSubCategoryDialogState extends State<AddSubCategoryDialog> {
         setState(() {
           _isSaving = false;
         });
+        Navigator.of(context).pop();
       }
     }
   }
@@ -92,13 +92,15 @@ class _AddSubCategoryDialogState extends State<AddSubCategoryDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              TextFormField(
-                controller: _nameController,
-                decoration:
-                    const InputDecoration(labelText: 'Subcategory Name'),
-                validator: (value) =>
-                    value == null || value.isEmpty ? 'Enter name' : null,
-                enabled: widget.initialSubCategory == null,
+              CustomTextFormWidget(
+                initialValue: currSubCategory.name,
+                label: 'Subcategory Name',
+                icon: const Icon(Icons.pan_tool_alt_sharp),
+                onChanged: (p0) => {
+                  setState(() {
+                    currSubCategory.name = p0;
+                  })
+                },
               ),
               const SizedBox(height: 12),
               IconPickerFormField(
@@ -109,27 +111,29 @@ class _AddSubCategoryDialogState extends State<AddSubCategoryDialog> {
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8.0)),
                 ),
-                onSaved: (value) {
-                  _icon = value;
+                onChanged: (value) {
+                  setState(() {
+                    currSubCategory.icon = value;
+                  });
                 },
               ),
               const SizedBox(height: 16),
               CreditDebitSwitch(
-                initialValue: _type,
+                initialValue: currSubCategory.type,
                 label: 'Type:',
                 onChanged: (val) {
                   setState(() {
-                    _type = val;
+                    currSubCategory.type = val;
                   });
                 },
               ),
               const SizedBox(height: 16),
               ColorPickerField(
-                initialColorHex: _color ?? '0xFF9E9E9E',
+                initialColorHex: currSubCategory.color ?? '0xFF9E9E9E',
                 label: 'Category Color',
                 onColorChanged: (hex) {
                   setState(() {
-                    _color = hex;
+                    currSubCategory.color = hex;
                   });
                 },
               ),
@@ -138,6 +142,18 @@ class _AddSubCategoryDialogState extends State<AddSubCategoryDialog> {
         ),
       ),
       actions: [
+        TextButton(
+          child: const Text('DELETE'),
+          onPressed: () async => {
+            await Provider.of<DataService>(context, listen: false)
+                .handleSubCategory(currSubCategory, widget.categoryId,
+                    currSubCategory.name, false, true),
+            if (mounted)
+              {
+                Navigator.of(context).pop(),
+              }
+          },
+        ),
         TextButton(
           child: const Text('Cancel'),
           onPressed: () => Navigator.of(context).pop(),

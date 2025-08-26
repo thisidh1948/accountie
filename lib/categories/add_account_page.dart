@@ -1,9 +1,11 @@
+import 'package:accountie/services/data_service.dart';
 import 'package:accountie/widgets/icon_picker_widget.dart';
 import 'package:accountie/widgets/color_picker.dart';
 import 'package:accountie/widgets/date_picker_form_field.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:accountie/models/account_model.dart'; // Adjust the import path for Account model
+import 'package:accountie/models/account_model.dart';
+import 'package:http/http.dart';
+import 'package:provider/provider.dart'; // Adjust the import path for Account model
 
 class AddAccountDialog extends StatefulWidget {
   final Account? initialAccount;
@@ -20,6 +22,7 @@ class _AddAccountDialogState extends State<AddAccountDialog> {
   late final TextEditingController _bankNameController;
   late final TextEditingController _accountNumberController;
   late final TextEditingController _creditLimitController;
+  bool _isUpdate = false;
   DateTime? _dueDate;
   DateTime? _billingCycleStartDay;
   int? _index;
@@ -32,11 +35,18 @@ class _AddAccountDialogState extends State<AddAccountDialog> {
   void initState() {
     super.initState();
     final acc = widget.initialAccount;
-    _accountholderController = TextEditingController(text: acc?.accountholder ?? '');
-    _InitbalanceController = TextEditingController(text: acc?.balance.toString() ?? '');
+    if (acc != null) {
+      _isUpdate = true;
+    }
+    _accountholderController =
+        TextEditingController(text: acc?.accountholder ?? '');
+    _InitbalanceController =
+        TextEditingController(text: acc?.balance.toString() ?? '');
     _bankNameController = TextEditingController(text: acc?.name ?? '');
-    _accountNumberController = TextEditingController(text: acc?.accountNumber ?? '');
-    _creditLimitController = TextEditingController(text: acc?.creditLimit?.toString() ?? '');
+    _accountNumberController =
+        TextEditingController(text: acc?.accountNumber ?? '');
+    _creditLimitController =
+        TextEditingController(text: acc?.creditLimit?.toString() ?? '');
     _dueDate = acc?.dueDate;
     _billingCycleStartDay = acc?.billingCycleStartDay;
     _index = acc?.index;
@@ -55,38 +65,61 @@ class _AddAccountDialogState extends State<AddAccountDialog> {
     super.dispose();
   }
 
+  Future<void> _delete(String accountName) async {
+    final dataService = Provider.of<DataService>(context, listen: false);
+    dataService.handleAccount(null, accountName, false, true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Account deleted successfully!')),
+    );
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
+  }
+
   Future<void> _saveAccount() async {
+    final dataService = Provider.of<DataService>(context, listen: false);
     if (_formKey.currentState!.validate()) {
       _formKey.currentState!.save();
-      setState(() { _isSaving = true; });
+      setState(() {
+        _isSaving = true;
+      });
       try {
         final account = Account(
           accountholder: _accountholderController.text.trim(),
           type: _type,
-          initialBalance: double.tryParse(_InitbalanceController.text.trim()) ?? 0.0,
+          initialBalance:
+              double.tryParse(_InitbalanceController.text.trim()) ?? 0.0,
           name: _bankNameController.text.trim(),
           accountNumber: _accountNumberController.text.trim(),
-          creditLimit: _type == 'credit' ? double.tryParse(_creditLimitController.text.trim()) : null,
+          creditLimit: _type == 'credit'
+              ? double.tryParse(_creditLimitController.text.trim())
+              : null,
           dueDate: _type == 'credit' ? _dueDate : null,
-          billingCycleStartDay: _type == 'credit' ? _billingCycleStartDay : null,
+          billingCycleStartDay:
+              _type == 'credit' ? _billingCycleStartDay : null,
           index: _index,
           icon: _icon,
           color: _color,
         );
-        final ref = FirebaseFirestore.instance.collection('accounts');
-        await ref.doc(account.accountNumber).set(account.toFirestore());
+        dataService.handleAccount(
+            account, account.accountNumber, _isUpdate, false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(widget.initialAccount == null
-              ? 'Account added successfully!'
-              : 'Account updated successfully!')),
+          SnackBar(
+              content: Text(widget.initialAccount == null
+                  ? 'Account added successfully!'
+                  : 'Account updated successfully!')),
         );
-        Navigator.of(context).pop();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error saving account: ${e.toString()}')),
         );
       } finally {
-        setState(() { _isSaving = false; });
+        if (mounted) {
+          setState(() {
+            _isSaving = false;
+          });
+          Navigator.of(context).pop();
+        }
       }
     }
   }
@@ -94,7 +127,8 @@ class _AddAccountDialogState extends State<AddAccountDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text(widget.initialAccount == null ? 'Add Account' : 'Edit Account'),
+      title:
+          Text(widget.initialAccount == null ? 'Add Account' : 'Edit Account'),
       content: Form(
         key: _formKey,
         child: SingleChildScrollView(
@@ -104,7 +138,9 @@ class _AddAccountDialogState extends State<AddAccountDialog> {
               TextFormField(
                 controller: _accountholderController,
                 decoration: const InputDecoration(labelText: 'Account Holder'),
-                validator: (value) => value == null || value.isEmpty ? 'Enter account holder' : null,
+                validator: (value) => value == null || value.isEmpty
+                    ? 'Enter account holder'
+                    : null,
                 enabled: widget.initialAccount == null,
               ),
               const SizedBox(height: 12),
@@ -113,7 +149,8 @@ class _AddAccountDialogState extends State<AddAccountDialog> {
                 initialValue: _icon ?? '',
                 decoration: InputDecoration(
                   labelText: 'Account Icon',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8.0)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0)),
                 ),
                 onSaved: (value) {
                   _icon = value;
@@ -139,7 +176,10 @@ class _AddAccountDialogState extends State<AddAccountDialog> {
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Row(
                         children: [
-                          Text('Credit', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                          Text('Credit',
+                              style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold)),
                           Switch(
                             value: _type == 'savings',
                             activeColor: Colors.green,
@@ -151,7 +191,10 @@ class _AddAccountDialogState extends State<AddAccountDialog> {
                               });
                             },
                           ),
-                          Text('Savings', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                          Text('Savings',
+                              style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -163,7 +206,8 @@ class _AddAccountDialogState extends State<AddAccountDialog> {
                 controller: _InitbalanceController,
                 decoration: const InputDecoration(labelText: 'Initial Balance'),
                 keyboardType: TextInputType.number,
-                validator: (value) => value == null || value.isEmpty ? 'Enter balance' : null,
+                validator: (value) =>
+                    value == null || value.isEmpty ? 'Enter balance' : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -205,17 +249,23 @@ class _AddAccountDialogState extends State<AddAccountDialog> {
       ),
       actions: [
         TextButton(
+          child: const Text('DELETE'),
+          onPressed: () => _delete(widget.initialAccount!.accountNumber),
+        ),
+        TextButton(
           child: const Text('Cancel'),
           onPressed: () => Navigator.of(context).pop(),
         ),
         ElevatedButton(
           onPressed: _isSaving ? null : _saveAccount,
           child: _isSaving
-              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 3))
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 3))
               : Text(widget.initialAccount == null ? 'Add' : 'Save'),
         ),
       ],
     );
   }
 }
-

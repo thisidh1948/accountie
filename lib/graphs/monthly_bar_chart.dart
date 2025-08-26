@@ -195,7 +195,6 @@ class MonthlyBarChart extends StatelessWidget {
                     barTouchData: BarTouchData(
                       enabled: true,
                       touchTooltipData: BarTouchTooltipData(
-                        tooltipBgColor: Colors.blueGrey.withOpacity(0.8),
                         tooltipPadding: const EdgeInsets.all(8),
                         tooltipMargin: 8,
                         getTooltipItem: (group, groupIndex, rod, rodIndex) {

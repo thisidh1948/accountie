@@ -3,31 +3,30 @@ import 'package:accountie/services/data_service.dart';
 import 'package:accountie/widgets/custom_textform_widget.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
 class AddLoanPage extends StatefulWidget {
-  final LoanModel? loanEdit;
+  final LoanModel? loan;
   final bool isGiven;
   final bool isEdit;
   const AddLoanPage(
-      {Key? key, required this.isGiven, required this.isEdit, this.loanEdit})
-      : super(key: key);
+      {super.key, required this.isGiven, required this.isEdit, this.loan});
 
   @override
-  _AddLoanPageState createState() => _AddLoanPageState();
+  AddLoanPageState createState() => AddLoanPageState();
 }
 
-class _AddLoanPageState extends State<AddLoanPage> {
+class AddLoanPageState extends State<AddLoanPage> {
   final _formKey = GlobalKey<FormState>();
-  DateTime _startDate = DateTime.now();
-  DateTime _endDate =
-      DateTime.now().add(Duration(days: 365)); // Default end date 30 days later
+// Default end date 30 days later
   LoanModel? _currentLoan;
 
+  @override
   void initState() {
     super.initState();
-    if (widget.isEdit && widget.loanEdit != null) {
-      _currentLoan = widget.loanEdit;
+    if (widget.isEdit && widget.loan != null) {
+      _currentLoan = widget.loan;
     } else {
       _currentLoan = LoanModel(
         loanId: '',
@@ -51,19 +50,19 @@ class _AddLoanPageState extends State<AddLoanPage> {
     final dataService = Provider.of<DataService>(context, listen: false);
     if (!_formKey.currentState!.validate()) return;
     _formKey.currentState!.save();
-    _currentLoan!.startDate = _startDate;
-    _currentLoan!.endDate = _endDate;
     if (widget.isEdit) {
-      // Update existing loan
-      await dataService.addLoan(_currentLoan!, true);
+      _currentLoan?.recalculateFromScratch();
+      await dataService.handleLoan(_currentLoan!, true);
     } else {
-      // Create new loan
+      _currentLoan?.isGiven = widget.isGiven;
       _currentLoan?.balanceAmount = _currentLoan!.principalAmount;
-      _currentLoan!.loanId = FirebaseFirestore.instance.collection('loans').doc().id;
-      await dataService.addLoan(_currentLoan!, false);
+      _currentLoan!.loanId =
+          FirebaseFirestore.instance.collection('loans').doc().id;
+      await dataService.handleLoan(_currentLoan!, false);
     }
-
-    Navigator.of(context).pop();
+    if (mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   @override
@@ -73,7 +72,7 @@ class _AddLoanPageState extends State<AddLoanPage> {
         title: Text(widget.isEdit ? 'Edit Loan' : 'Create New Loan'),
       ),
       body: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: ListView(
@@ -82,7 +81,7 @@ class _AddLoanPageState extends State<AddLoanPage> {
               CustomTextFormWidget(
                 label: 'Party Name',
                 initialValue: widget.isEdit ? _currentLoan!.partyName : '',
-                icon: Icon(Icons.person),
+                icon: const Icon(Icons.person),
                 keyboardType: TextInputType.text,
                 validator: (value) => value == null || value.isEmpty
                     ? 'Please enter party name'
@@ -110,7 +109,6 @@ class _AddLoanPageState extends State<AddLoanPage> {
                     _currentLoan!.principalAmount =
                         value.isEmpty ? 0.0 : double.parse(value);
                   }
-                  ;
                 },
               ),
               const SizedBox(height: 10), //Interest Rate
@@ -118,8 +116,8 @@ class _AddLoanPageState extends State<AddLoanPage> {
                 label: 'Interest Rate (%)',
                 initialValue:
                     widget.isEdit ? _currentLoan!.interestRate.toString() : '',
-                icon: Icon(Icons.percent),
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                icon: const Icon(Icons.percent),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
                 validator: (value) => value == null || value.isEmpty
                     ? 'Please enter interest rate'
                     : null,
@@ -140,38 +138,43 @@ class _AddLoanPageState extends State<AddLoanPage> {
                   Expanded(
                     child: ListTile(
                       title: Text(
-                          'Start Date: ${_startDate.toLocal().toString().split(' ')[0]}'),
-                      trailing: Icon(Icons.calendar_today),
+                          'Start Date: ${_currentLoan?.startDate.toLocal().toString().split(' ')[0]}'),
+                      trailing: const Icon(Icons.calendar_today),
                       onTap: () async {
                         final dt = await showDatePicker(
                           context: context,
-                          initialDate: _startDate,
+                          initialDate:
+                              _currentLoan?.startDate ?? DateTime.now(),
                           firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
                         );
-                        if (dt != null) setState(() => _startDate = dt);
+                        if (dt != null) {
+                          setState(() => _currentLoan?.startDate = dt);
+                        }
                       },
                     ),
                   ),
                   Expanded(
                     child: ListTile(
                       title: Text(
-                          'End Date: ${_endDate.toLocal().toString().split(' ')[0]}'),
-                      trailing: Icon(Icons.calendar_today),
+                          'End Date: ${_currentLoan?.endDate?.toLocal().toString().split(' ')[0]}'),
+                      trailing: const Icon(Icons.calendar_today),
                       onTap: () async {
                         final dt = await showDatePicker(
                           context: context,
-                          initialDate: _endDate,
-                          firstDate: _startDate,
+                          initialDate: _currentLoan?.endDate,
+                          firstDate: DateTime(2000),
                           lastDate: DateTime(2100),
                         );
-                        if (dt != null) setState(() => _endDate = dt);
+                        if (dt != null) {
+                          setState(() => _currentLoan?.endDate = dt);
+                        }
                       },
                     ),
                   ),
-                  Expanded(child: Text('Is Given:')),
+                  const Expanded(child: Text('Is Given:')),
                   Switch(
-                    value: widget.isGiven,
+                    value: _currentLoan!.isGiven,
                     onChanged: (value) {
                       setState(() {
                         _currentLoan!.isGiven = value;
@@ -181,7 +184,6 @@ class _AddLoanPageState extends State<AddLoanPage> {
                 ],
               ),
               const SizedBox(height: 10),
-              SizedBox(height: 20),
               Row(
                 crossAxisAlignment: CrossAxisAlignment
                     .center, // Align items vertically in the center
@@ -228,7 +230,7 @@ class _AddLoanPageState extends State<AddLoanPage> {
               CustomTextFormWidget(
                 label: 'Notes',
                 initialValue: widget.isEdit ? _currentLoan!.notes : '',
-                icon: Icon(Icons.note),
+                icon: const Icon(Icons.note),
                 keyboardType: TextInputType.multiline,
                 maxLines: 2,
                 onChanged: (value) {
@@ -238,6 +240,98 @@ class _AddLoanPageState extends State<AddLoanPage> {
                 },
               ),
               const SizedBox(height: 20),
+              if (widget.isEdit && _currentLoan!.installments.isNotEmpty)
+                ...List.generate(_currentLoan!.installments.length, (index) {
+                  final installment = _currentLoan!.installments[index];
+                  return Card(
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    elevation: 2,
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Installment ${index + 1}',
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold)),
+                          Row(
+                            children: [
+                              Expanded(
+                                flex: 1,
+                                child: TextFormField(
+                                  initialValue: DateFormat('dd/MM/yyyy').format(
+                                      installment.paidDate ?? DateTime.now()),
+                                  keyboardType: TextInputType.datetime,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Paid Date'),
+                                  onChanged: (value) {
+                                    installment.paidDate =
+                                        _tryParseDate(value) ?? DateTime.now();
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                flex: 2,
+                                child: TextFormField(
+                                  initialValue: installment.principalComponent
+                                      .toStringAsFixed(2),
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Principal'),
+                                  onChanged: (value) {
+                                    installment.principalComponent =
+                                        double.tryParse(value) ?? 0.0;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                flex: 1,
+                                child: TextFormField(
+                                  initialValue: installment.interestComponent
+                                      .toStringAsFixed(2),
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Interest'),
+                                  onChanged: (value) {
+                                    installment.interestComponent =
+                                        double.tryParse(value) ?? 0.0;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                flex: 2,
+                                child: TextFormField(
+                                  initialValue:
+                                      installment.paidAmount.toStringAsFixed(2),
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                      labelText: 'Paid Amount'),
+                                  onChanged: (value) {
+                                    installment.paidAmount =
+                                        double.tryParse(value) ?? 0.0;
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              ElevatedButton.icon(
+                                label: const Text('Delete'),
+                                onPressed: () => {
+                                  setState(() {
+                                    _currentLoan!.installments.removeAt(index);
+                                  })
+                                },
+                              )
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+
               ElevatedButton(
                 onPressed: _submit,
                 child: Text(widget.isEdit ? 'Edit Loan' : 'Create Loan'),
@@ -247,5 +341,13 @@ class _AddLoanPageState extends State<AddLoanPage> {
         ),
       ),
     );
+  }
+}
+
+DateTime? _tryParseDate(String input) {
+  try {
+    return DateFormat('dd/MM/yyyy').parseStrict(input);
+  } catch (_) {
+    return null;
   }
 }

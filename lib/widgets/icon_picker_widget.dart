@@ -11,6 +11,7 @@ class IconPickerFormField extends FormField<String> {
     AutovalidateMode super.autovalidateMode = AutovalidateMode.disabled,
     InputDecoration decoration = const InputDecoration(),
     required BuildContext context, // Need context to show the dialog
+    void Function(String?)? onChanged,
   }) : super(
           builder: (FormFieldState<String> state) {
             // Get the current selected icon file name from the form field state
@@ -25,10 +26,12 @@ class IconPickerFormField extends FormField<String> {
                 },
               );
 
-              // If an icon was picked, update the form field's value
+              // If an icon was picked, update the form field's value and call onChanged
               if (pickedIcon != null) {
-                state.didChange(
-                    pickedIcon); // Update the internal form field state
+                state.didChange(pickedIcon); // Update the internal form field state
+                if (onChanged != null) {
+                  onChanged(pickedIcon);
+                }
               }
             }
 
@@ -66,8 +69,12 @@ class IconPickerFormField extends FormField<String> {
                   readOnly: true, // Make the text field read-only
                   onTap:
                       showIconPicker, // Also allow tapping the field to open picker
-                  // Disable the default onChanged as we manage the value with state.didChange
-                  onChanged: (value) {},
+                  // Call onChanged if provided, otherwise do nothing
+                  onChanged: (val) {
+                    if (onChanged != null) {
+                      onChanged(val);
+                    }
+                  },
                   // No validator here, validation is handled by the FormField validator
                 ),
                 // Display validation error message if any

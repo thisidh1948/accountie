@@ -1,4 +1,4 @@
-import 'package:accountie/home_page.dart';
+
 import 'package:accountie/signin_page.dart';
 import 'package:accountie/theme/theme_provider.dart';
 import 'package:accountie/services/data_service.dart'; // Import your DataService
@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
+import 'home/dash_board.dart';
 
 
 void main() async {

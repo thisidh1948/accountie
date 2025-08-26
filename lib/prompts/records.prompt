@@ -1,4 +1,4 @@
-Create a New Page to Add/Update Transactions
+hould UII Create a New Page to Add/Update Transactions
 model: lib\models\record_model.dart
 to get the Icon wider use: lib\widgets\svg_icon_widgets.dart
 DataBase: cloud firestore
@@ -16,3 +16,12 @@ FormFeilds:
   final String? description; // TextField
   final List<String>? tags; // Dailog box: with name of tags collection -> in dailog display tag name displayed on tag icon with random colors
   final LocationModel? location; // should be auto picked from mobile or web where ever it is opened
+
+Create Transaction View page:
+  We provide: List<TRecord> records = context.watch<DataService>().records;
+  Expected: 
+  1. horizantly scrollable page by month and initial month should be current month
+  2. Each Transaction tile should contaion first item icon ?? subcategory icon amount (red for debit and green for credit), Account
+  3. on Tap on the tile pop up bottom detailer widget containing all the details.
+  4. UI should be modern looking and responsive
+

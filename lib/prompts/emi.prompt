@@ -41,3 +41,75 @@ write a java logic based on this fields:
     });
 
     not a emi, for loan which took loan we make some payments in between randomly. we store them in Installment[isEmiPayment=false, paidDate, paidAmount]. there can be mutilple payments in between. so we need to iterate through installments in date ascending order for first payment (if there) balanceAmount = principalAmount + interestComponent from now to strat date - paidAmount. for the next paid installment balanceAmount = balanceAmount + interestComponent from last paidDate to now - paidAmount. when balanceAmount =0 status = paid
+
+
+create a modern looking LoanViewPage:
+
+final List<LoanModel> loans = context.watch<DataService>().records
+appBar: {
+  Title: Text(loans)
+  //Switch button isGiven true or false so only shows is given loans or not given loans
+  }
+Body: {
+[filterByName by unique[partyName]] -> option
+Card: {Total Balance Amount, InterestAccumulated, balAmount + interstAccumulated}
+ListTile{
+  column(
+Text{loan.partyName}
+Row(Text{loan.balanceAmount}, Text{accumulatedInterest})
+Leading: Amount to be Paid {balAmount + interstAccumulated}
+onTap: {Navigator.push(context,MaterialPageRoute(builder: (_) => LoanDetailsPage(loan: loan)),);},}
+onLongpress: 
+floatingActionbutton:       floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.of(context).push(MaterialPageRoute(
+              builder: (_) => AddLoanPage(isGiven: true, isEdit: false)));
+        },
+        child: Icon(Icons.add),
+        tooltip: 'Add New Loan',
+      ),
+//the List Tile should Act like progress bar like higlight Tile 80 percent of the Tile Light green color if 80 percent of the princial amoung is paid. }
+
+//Table
+            DataTable(
+                columns: const [
+                  DataColumn(label: Text('ID')),
+                  DataColumn(label: Text('Paid Date')),
+                  DataColumn(label: Text('Principal')),
+                  DataColumn(label: Text('Scheduled')),
+                  DataColumn(label: Text('Interest')),
+                  DataColumn(label: Text('Paid')),
+                  DataColumn(label: Text('Status')),
+                ],
+                rows: loan.installments.map((installment) {
+                  return DataRow(cells: [
+                    DataCell(Text(installment.installmentId)),
+                    DataCell(Text(installment.paidDate != null
+                        ? DateFormat('dd/MM/yyyy').format(installment.paidDate!)
+                        : 'N/A')),
+                    DataCell(
+                        Text(installment.scheduledAmount.toStringAsFixed(2))),
+                    DataCell(
+                        Text(installment.interestComponent.toStringAsFixed(2))),
+                    DataCell(Text(
+                        installment.principalComponent.toStringAsFixed(2))),
+                    DataCell(Text(
+                        installment.paidAmount?.toStringAsFixed(2) ?? 'N/A')),
+                    DataCell(Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color:
+                            installment.isPaid ? Colors.green : Colors.orange,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        installment.isPaid ? 'Paid' : 'Pending',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    )),
+                  ]);
+                }).toList(),
+              ),
+            
+            const SizedBox(height: 20),

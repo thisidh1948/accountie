@@ -1,9 +1,10 @@
+import 'package:accountie/services/data_service.dart';
 import 'package:accountie/widgets/color_picker.dart';
+import 'package:accountie/widgets/custom_textform_widget.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:accountie/models/category_model.dart'; // Assuming this is the correct path for your Category model
 import 'package:accountie/widgets/icon_picker_widget.dart';
-import 'package:flutter_colorpicker/flutter_colorpicker.dart'; // Adjust the import path for IconPickerFormField
+import 'package:provider/provider.dart';
 
 class AddCategoryDialog extends StatefulWidget {
   final Category? initialCategory; // Optional: for editing existing categories
@@ -16,106 +17,55 @@ class AddCategoryDialog extends StatefulWidget {
 
 class _AddCategoryDialogState extends State<AddCategoryDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  String? _selectedIconFileName; // To hold the selected icon file name
-  String?
-      _selectedColorHex; // To hold the selected color hex string (e.g., '0xFFFFFFFF')
-  int? _initialIndex; // To hold the initial index for editing
-
   bool _isSaving = false;
+  bool _isUpdate = false;
+  late Category _currCat;
 
   @override
   void initState() {
     super.initState();
     if (widget.initialCategory != null) {
-      // If an initial category is provided, pre-fill the form fields
-      _nameController.text = widget.initialCategory!.name;
-      _selectedIconFileName = widget.initialCategory!.icon;
-      _selectedColorHex = widget.initialCategory!.color;
-      _initialIndex = widget.initialCategory!.index;
+      _isUpdate = true;
+      _currCat = widget.initialCategory!;
+    } else {
+      _currCat = Category(
+          name: '', icon: '', color: '0xFF9E9E9E', index: 0, subcategories: []);
     }
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
     super.dispose();
   }
 
   Future<void> _saveCategory() async {
-    if (_formKey.currentState!.validate()) {
-      _formKey.currentState!.save(); // Trigger onSaved for all form fields
+    final dataService = Provider.of<DataService>(context, listen: false);
 
-      setState(() {
-        _isSaving = true;
-      });
+    if (!_isSaving) {
+      if (_formKey.currentState?.validate() ?? false) {
+        _formKey.currentState?.save();
+        setState(() {
+          _isSaving = true;
+        });
 
-      try {
-        final String categoryName = _nameController.text.trim();
-        final String icon = _selectedIconFileName ??
-            ''; // Default to empty string if no icon selected
-        final String color = _selectedColorHex ??
-            '0xFF9E9E9E'; // Default to grey if no color selected (or any default color you prefer)
-
-        if (widget.initialCategory == null) {
-          // Adding a new category
-          // Determine the next index
-          final QuerySnapshot<Map<String, dynamic>> snapshot =
-              await FirebaseFirestore.instance.collection('categories').get();
-          final int nextIndex =
-              snapshot.docs.length; // Simple count for next index
-
-          final newCategory = Category(
-            name: categoryName,
-            subcategories: [], // New categories start with no subcategories
-            icon: icon,
-            color: color,
-            index: nextIndex,
-          );
-
-          await FirebaseFirestore.instance
-              .collection('categories')
-              .doc(
-                  categoryName) // Use category name as document ID for simplicity
-              .set(newCategory.toFirestore());
-
-          print('Category added successfully!');
+        try {
+          await dataService.handleCategory(_currCat, _currCat.name, _isUpdate, false);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Category added successfully!')),
           );
-        } else {
-          // Editing an existing category
-          final updatedCategory = Category(
-            name: categoryName,
-            subcategories: widget
-                .initialCategory!.subcategories, // Keep existing subcategories
-            icon: icon,
-            color: color,
-            index: _initialIndex ?? 0, // Keep existing index or default
-          );
-
-          await FirebaseFirestore.instance
-              .collection('categories')
-              .doc(widget.initialCategory!
-                  .name) // Use original category name as doc ID
-              .update(updatedCategory.toFirestore());
-
-          print('Category updated successfully!');
+        } catch (e) {
+          print('Error saving category: $e');
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Category updated successfully!')),
+            SnackBar(content: Text('Error saving category: ${e.toString()}')),
           );
+        } finally {
+          if (mounted) {
+            setState(() {
+              _isSaving = false;
+            });
+            Navigator.of(context).pop();
+          }
         }
-
-        Navigator.of(context).pop(); // Close the dialog on success
-      } catch (e) {
-        print('Error saving category: $e');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving category: ${e.toString()}')),
-        );
-      } finally {
-        setState(() {
-          _isSaving = false;
-        });
       }
     }
   }
@@ -132,50 +82,39 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              // Category Name Field
-              TextFormField(
-                controller: _nameController,
-                decoration: InputDecoration(
-                  labelText: 'Category Name',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8.0)),
-                  prefixIcon: const Icon(Icons.category),
-                ),
-                textInputAction: TextInputAction.next,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter category name';
-                  }
-                  return null;
+              CustomTextFormWidget(
+                label: 'Category Name',
+                initialValue: _currCat.name,
+                icon: const Icon(Icons.category),
+                onChanged: (value) {
+                  setState(() {
+                    _currCat.name = value;
+                  });
                 },
-                enabled: widget.initialCategory ==
-                    null, // Disable editing name for existing categories if using name as doc ID
               ),
               const SizedBox(height: 16),
-
-              // Icon Picker Field
               IconPickerFormField(
                 context: context,
                 initialValue:
-                    _selectedIconFileName ?? '', // Corrected parameter name
+                    _currCat.icon ?? _currCat.name, // Corrected parameter name
                 decoration: InputDecoration(
                   labelText: 'Category Icon',
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8.0)),
                 ),
-                onSaved: (value) {
-                  _selectedIconFileName = value;
+                onChanged: (icon) {
+                    _currCat.icon = icon;
                 },
               ),
               const SizedBox(height: 16),
 
               // Color Picker Field (Simple example, you might use a dedicated package)
               ColorPickerField(
-                initialColorHex: _selectedColorHex ?? '0xFF9E9E9E',
+                initialColorHex: _currCat.color ?? '0xFF9E9E9E',
                 label: 'Category Color',
                 onColorChanged: (hex) {
                   setState(() {
-                    _selectedColorHex = hex;
+                    _currCat.color = hex;
                   });
                 },
               ),
@@ -184,6 +123,14 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
         ),
       ),
       actions: <Widget>[
+        TextButton(
+          child: const Text('DELETE'),
+          onPressed: () async {
+            await Provider.of<DataService>(context, listen: false)
+                .handleCategory(_currCat, _currCat.name, false, true);
+            Navigator.of(context).pop();
+          },
+        ),
         TextButton(
           child: const Text('Cancel'),
           onPressed: () {
@@ -201,13 +148,11 @@ class _AddCategoryDialogState extends State<AddCategoryDialog> {
                     strokeWidth: 3,
                   ),
                 )
-              : Text(widget.initialCategory == null
+              : Text(!_isUpdate
                   ? 'Add Category'
                   : 'Save Changes'),
         ),
       ],
     );
   }
-
-  }
-
+}

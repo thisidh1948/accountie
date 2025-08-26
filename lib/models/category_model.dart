@@ -102,4 +102,12 @@ class Item extends Structure {
   Map<String, dynamic> toMap() {
     return super.toMapStructure();
   }
+
+  void replaceWith(Item item) {
+    name = item.name;
+    icon = item.icon;
+    color = item.color;
+    index = item.index;
+  }
+
 }
